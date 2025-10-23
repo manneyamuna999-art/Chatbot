@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jarvis — Voice Chatbot (JS)</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#10182a; --muted:#8aa0b3; --text:#e6f1ff; --accent:#6ee7ff; --accent2:#9bffb2;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#122035,transparent),var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;}
+    .app{max-width:920px;margin:24px auto;padding:18px}
+    .title{display:flex;align-items:center;gap:12px}
+    .avatar{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#b7a6ff);box-shadow:0 8px 24px rgba(110,231,255,.25)}
+    .avatar svg{filter:drop-shadow(0 2px 10px rgba(110,231,255,.5))}
+    .sub{color:var(--muted);margin-top:4px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}
+    .panel .card{flex:1;min-width:260px;padding:14px}
+    .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    button, .toggle{background:#17233a;color:var(--text);border:1px solid rgba(255,255,255,.1);padding:10px 14px;border-radius:12px;cursor:pointer;transition:.2s}
+    button:hover,.toggle:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.22)}
+    button.primary{background:linear-gradient(135deg,var(--accent),#91ffce);color:#0b1220;font-weight:700}
+    .status{font-size:13px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:18px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .chat{height:60vh;min-height:380px;overflow:auto;padding:16px}
+    .msg{display:flex;gap:10px;margin:10px 0}
+    .msg .bubble{padding:12px 14px;border-radius:14px;max-width:75%;line-height:1.35}
+    .msg.user{justify-content:flex-end}
+    .msg.user .bubble{background:#1d2a44}
+    .msg.bot .bubble{background:#14243d;border:1px solid rgba(255,255,255,.08)}
+    .msg .who{font-size:12px;color:var(--muted);margin:0 8px}
+    .inputbar{display:flex;gap:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08)}
+    .inputbar input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#111b2d;color:var(--text)}
+    .hint{font-size:13px;color:var(--muted)}
+    .help{padding:12px}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#13223a;border:1px dashed rgba(255,255,255,.13);margin:6px 6px 0 0;font-size:13px}
+    .log{height:120px;overflow:auto;background:#0e1830;border-radius:12px;padding:10px;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;color:#cde3ff;border:1px solid rgba(255,255,255,.08)}
+    a{color:var(--accent)}
+
+    /* Add this to your <style> section */
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(110,231,255,0.7); }
+      70% { box-shadow: 0 0 0 16px rgba(110,231,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(110,231,255,0); }
+    }
+    .avatar.pulse {
+      animation: pulse 0.7s;
+    }
+    @keyframes listeningGlow {
+      0% { box-shadow: 0 0 0 0 #00bfff88; }
+      50% { box-shadow: 0 0 24px 8px #00bfffcc; }
+      100% { box-shadow: 0 0 0 0 #00bfff88; }
+    }
+    .avatar.listening {
+      animation: listeningGlow 1.2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="title">
+      <div class="avatar" aria-hidden="true">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <!-- Blue glow background -->
+          <circle cx="32" cy="32" r="28" fill="#6ee7ff" opacity="0.15">
+            <animate attributeName="opacity" values="0.15;0.35;0.15" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <!-- Robot head -->
+          <rect x="16" y="20" width="32" height="24" rx="12" fill="#6ee7ff" stroke="#001" stroke-width="2"/>
+          <!-- Eyes -->
+          <ellipse cx="26" cy="32" rx="4" ry="4" fill="#fff">
+            <animate attributeName="fill" values="#fff;#00bfff;#fff" dur="1.2s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="38" cy="32" rx="4" ry="4" fill="#fff">
+            <animate attributeName="fill" values="#fff;#00bfff;#fff" dur="1.2s" repeatCount="indefinite" begin="0.6s"/>
+          </ellipse>
+          <!-- Mouth -->
+          <rect x="26" y="40" width="12" height="3" rx="1.5" fill="#001"/>
+          <!-- Antenna -->
+          <rect x="31" y="10" width="2" height="10" rx="1" fill="#9bffb2">
+            <animate attributeName="y" values="10;4;10" dur="1.2s" repeatCount="indefinite"/>
+          </rect>
+          <circle cx="32" cy="10" r="3" fill="#00bfff">
+            <animate attributeName="cy" values="10;4;10" dur="1.2s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="3;5;3" dur="1.2s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+      </div>
+      <div>
+        <h1 style="margin:0">Yammi — Voice Chatbot</h1>
+        <div class="sub">Say <strong>“Hey Jarvis”</strong> or press the mic • Works with Web Speech API (Chrome/Edge)</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="controls">
+          <button id="btnMic" class="primary">🎙️ Start Listening</button>
+          <button id="btnStop">🛑 Stop</button>
+          <label class="toggle"><input id="ttsToggle" type="checkbox" checked /> Speak responses</label>
+          <label class="toggle"><input id="wakeToggle" type="checkbox" checked /> Wake word: “Jarvis”</label>
+        </div>
+        <div class="status" id="status">Idle</div>
+      </div>
+      <div class="card">
+        <div class="help">
+          <div class="hint">Try:</div>
+          <div class="pill">“What’s the time?”</div>
+          <div class="pill">“Open YouTube”</div>
+          <div class="pill">“Search for Python list methods”</div>
+          <div class="pill">“Tell me a joke”</div>
+          <div class="pill">“Set a reminder to drink water”</div>
+          <div class="pill">“Remember that my project is due Friday”</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card" style="display:flex;flex-direction:column">
+        <div id="chat" class="chat"></div>
+        <div class="inputbar">
+          <input id="textInput" placeholder="Type a message and press Enter..."/>
+          <button id="send">Send</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="help">
+          <h3 style="margin-top:4px">Capabilities</h3>
+          <ul>
+            <li>Voice recognition & text-to-speech</li>
+            <li>Wake word: “hey jarvis” (toggleable)</li>
+            <li>Open sites & web search</li>
+            <li>Time, date, math, jokes</li>
+            <li>Local notes & reminders (stored in your browser)</li>
+          </ul>
+          <h4>Voice Log</h4>
+          <div id="log" class="log"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Utilities ===
+    const $ = (sel) => document.querySelector(sel);
+    const chat = $('#chat');
+    const log = $('#log');
+    const statusEl = $('#status');
+
+    function addMsg(who, text){
+      const wrap = document.createElement('div');
+      wrap.className = `msg ${who}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      const whoLabel = document.createElement('div');
+      whoLabel.className = 'who';
+      whoLabel.textContent = who === 'user' ? 'You' : 'Jarvis';
+      if(who==='user'){
+        wrap.appendChild(bubble);
+        wrap.appendChild(whoLabel);
+      } else {
+        wrap.appendChild(whoLabel);
+        wrap.appendChild(bubble);
+      }
+      chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function logLine(text){
+      const p = document.createElement('div');
+      p.textContent = text;
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // === Speech Synthesis ===
+    const tts = {
+      enabled: true,
+      speak(text){
+        if(!this.enabled) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1.02; utter.pitch = 1; utter.volume = 1;
+        const voices = speechSynthesis.getVoices();
+        const preferred = voices.find(v => /en-US|en-GB/i.test(v.lang));
+        if(preferred) utter.voice = preferred;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utter);
+      }
+    };
+
+    $('#ttsToggle').addEventListener('change', (e)=>{ tts.enabled = e.target.checked; });
+
+    // === Knowledge & Commands ===
+    const jokes = [
+      "Why do programmers prefer dark mode? Because light attracts bugs!",
+      "I told my computer I needed a break, and it said: 'No problem, I'll go to sleep.'",
+      "There are 10 types of people: those who understand binary and those who don't.",
+      "Debugging: Removing the needles from the haystack."
+    ];
+
+    const store = {
+      key: 'jarvis_notes_v1',
+      get(){ try { return JSON.parse(localStorage.getItem(this.key)||'[]'); } catch { return []; } },
+      set(v){ localStorage.setItem(this.key, JSON.stringify(v)); },
+      add(note){ const cur=this.get(); cur.push({note, at: Date.now()}); this.set(cur); },
+      clear(){ this.set([]); }
+    };
+
+    function humanTime(d=new Date()){
+      return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+
+    function handleCommand(raw){
+      const text = raw.trim();
+      const lower = text.toLowerCase();
+
+      // Wake word filtering
+      const wakeOn = $('#wakeToggle').checked;
+      const wakeWords = ['hey jarvis', 'ok jarvis', 'jarvis'];
+      let content = lower;
+      if(wakeOn){
+        const foundWake = wakeWords.some(w => lower.startsWith(w));
+        if(foundWake){ content = lower.replace(/^(hey\s+jarvis|ok\s+jarvis|jarvis)[,\s]*/,''); }
+        else { return null; } // ignore if wake word required but not present
+      }
+      if(!content) return reply("I'm listening.");
+
+      // Small talk
+      if(/^(hi|hello|hey)\b/.test(content)) return reply("Hello! How can I help?");
+      if(/how are you/.test(content)) return reply("All systems nominal. How are you?");
+
+      // Time & date
+      if(/time/.test(content)) return reply(`It's ${humanTime()}.`);
+      if(/date/.test(content)) return reply(`Today is ${new Date().toLocaleDateString()}.`);
+
+      // Math (simple)
+      if(/^calculate\s+/.test(content) || /^what is\s+/.test(content)){
+        const expr = content.replace(/^calculate\s+|^what is\s+/,'');
+        try {
+          // VERY simple safe eval: only digits, operators, spaces, parentheses, decimal
+          if(!/^[0-9+\-*/().%\s^]+$/.test(expr)) throw new Error('unsupported');
+          const safe = expr.replace(/\^/g,'**');
+          // eslint-disable-next-line no-new-func
+          const val = Function(`"use strict"; return (${safe})`)();
+          return reply(`Result: ${val}`);
+        } catch(e){ return reply("Sorry, I couldn't calculate that."); }
+      }
+
+      // Jokes
+      if(/joke/.test(content)){
+        const j = jokes[Math.floor(Math.random()*jokes.length)];
+        return reply(j);
+      }
+
+      // Notes & reminders
+      if(/^(remember that|remember)\b/.test(content)){
+        const note = text.replace(/^(hey\s*jarvis[,\s]*)?/i,'').replace(/^remember( that)?\s*/i,'');
+        if(note){ store.add(note); return reply(`Got it. I'll remember: "${note}"`); }
+        return reply("What should I remember?");
+      }
+      if(/what did (i|we) (ask you to )?remember|my notes|show (my )?notes/.test(content)){
+        const notes = store.get();
+        if(notes.length===0) return reply("You don't have any saved notes yet.");
+        const lines = notes.slice(-6).map(n=>`• ${n.note}`);
+        return reply(lines.join('\n'));
+      }
+      if(/clear (my )?notes|forget everything|reset notes/.test(content)){
+        store.clear();
+        return reply("All notes cleared.");
+      }
+
+      // Open website
+      if(/^open\s+/.test(content)){
+        const site = content.replace(/^open\s+/, '').trim();
+        const map = {
+          youtube:'https://www.youtube.com', google:'https://www.google.com', github:'https://github.com',
+          gmail:'https://mail.google.com', maps:'https://maps.google.com', wikipedia:'https://wikipedia.org'
+        };
+        const url = map[site] || (site.startsWith('http') ? site : `https://${site}.com`);
+        window.open(url, '_blank','noopener');
+        return reply(`Opening ${site}...`);
+      }
+
+      // Web search
+      if(/^search( for)?\s+/.test(content)){
+        const q = content.replace(/^search( for)?\s+/, '');
+        const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+        window.open(url,'_blank','noopener');
+        return reply(`Searching the web for “${q}”.`);
+      }
+
+      // System-ish helpers
+      if(/(scroll down)/.test(content)) { window.scrollBy({top: window.innerHeight/2, behavior:'smooth'}); return reply('Scrolling.'); }
+      if(/(scroll up)/.test(content)) { window.scrollBy({top: -window.innerHeight/2, behavior:'smooth'}); return reply('Scrolling.'); }
+
+      // Fallback
+      return reply("I didn't understand that. Try: 'time', 'open youtube', 'search for cats', or 'tell me a joke'.");
+    }
+
+    function reply(text){
+      addMsg('bot', text);
+      tts.speak(text);
+      // Animate avatar
+      const avatar = document.querySelector('.avatar');
+      avatar.classList.add('pulse');
+      setTimeout(()=>avatar.classList.remove('pulse'), 700);
+      return text;
+    }
+
+    // === Text input ===
+    $('#send').addEventListener('click', sendText);
+    $('#textInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ sendText(); }});
+    function sendText(){
+      const val = $('#textInput').value.trim();
+      if(!val) return;
+      addMsg('user', val);
+      $('#textInput').value='';
+      // When you type, bypass wake word requirement
+      const wakeWas = $('#wakeToggle').checked;
+      $('#wakeToggle').checked = false;
+      handleCommand(val);
+      $('#wakeToggle').checked = wakeWas;
+    }
+
+    // === Speech Recognition ===
+    let recognition = null;
+    let listening = false;
+
+    function setListeningVisual(on) {
+      const avatar = document.querySelector('.avatar');
+      if (on) {
+        avatar.classList.add('listening');
+      } else {
+        avatar.classList.remove('listening');
+      }
+    }
+
+    function initRecognition(){
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SR){ statusEl.textContent = 'Speech Recognition not supported in this browser. Use Chrome/Edge.'; return; }
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.interimResults = true;
+      recognition.continuous = true;
+
+      recognition.onstart = ()=>{
+        listening=true;
+        statusEl.textContent='Listening… (speak now)';
+        logLine('[start]');
+        setListeningVisual(true); // Add animation
+      };
+      recognition.onend = ()=>{
+        listening=false;
+        statusEl.textContent='Idle';
+        logLine('[end]');
+        setListeningVisual(false); // Remove animation
+      };
+      recognition.onerror = (e)=>{
+        statusEl.textContent = 'Error: '+e.error;
+        logLine('[error] '+e.error);
+        setListeningVisual(false); // Remove animation
+      };
+      recognition.onresult = (event)=>{
+        let finalTranscript = '';
+        for(let i=event.resultIndex;i<event.results.length;i++){
+          const res = event.results[i];
+          if(res.isFinal){
+            finalTranscript += ' ' + res[0].transcript.trim();
+          }
+        }
+        if(finalTranscript){
+          handleCommand(finalTranscript);
+          logLine('heard: '+finalTranscript);
+          addMsg('user', finalTranscript);
+        }
+      };
+
+      // Restart recognition on end (unless stopped)
+      $('#btnStop').addEventListener('click', ()=>{ if(recognition && listening){ recognition.stop(); }});
+      recognition.onend = ()=>{
+        listening=false;
+        statusEl.textContent='Idle';
+        logLine('[end]');
+        setListeningVisual(false); // Remove animation
+        if(!$('#btnStop').disabled) {
+          // Restart recognition after a short delay
+          setTimeout(() => {
+            if(recognition && !listening){
+              recognition.start();
+            }
+          }, 300);
+        }
+      };
+    }
+
+    window.addEventListener('load', ()=>{
+      speechSynthesis.getVoices();
+      // iOS/voice list quirk: warm up TTS voices
+      addMsg('bot', "Hello, I'm Jarvis. Say 'Hey Jarvis' to start, or type below.");
+    });
+
+    $('#btnMic').addEventListener('click', ()=>{
+      if(recognition && !listening){
+        recognition.start();
+      }
+    });
+  </script>
+</body>
+</html>
